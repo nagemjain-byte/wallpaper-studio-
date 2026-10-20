@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#111111">
+<title>Wallpaper Studio</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{background:#111;color:#eee;font:15px system-ui,sans-serif;padding:env(safe-area-inset-top) 12px 80px}
+nav{display:flex;gap:6px;padding:12px 0;position:sticky;top:0;background:#111;z-index:5}
+nav button,.b{flex:1;padding:11px;border:0;border-radius:10px;background:#272233;color:#eee;font-size:14px}
+nav .on,.b.p{background:#7c5cff}
+#cv{display:block;margin:0 auto;width:min(100%,300px);aspect-ratio:9/20;border-radius:18px;background:#000}
+.row{display:flex;gap:8px;margin:12px 0}
+input[type=range]{width:100%;margin:8px 0}
+#lib{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+#lib div{position:relative;aspect-ratio:9/16;border-radius:8px;overflow:hidden;background:#222}
+#lib img{width:100%;height:100%;object-fit:cover}
+#lib i{position:absolute;right:5px;top:3px;font-style:normal;color:#ff4d7d}
+#v{position:fixed;inset:0;background:#000e;display:none;flex-direction:column;align-items:center;padding:12px;z-index:9}
+#v img{flex:1;min-height:0;max-width:100%;border-radius:14px}
+#v .row{width:100%}
+#t{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#7c5cff;padding:8px 16px;border-radius:20px;display:none;z-index:20}
+.hide{display:none}
+</style></head><body>
+<nav><button id="n0" class="on">Create</button><button id="n1">Import</button><button id="n2">Library</button></nav>
+
+<section id="s0">
+  <canvas id="cv"></canvas>
+  <div class="row"><button class="b" id="m0">Gradient</button><button class="b" id="m1">3D tunnel</button></div>
+  <div class="row"><button class="b" id="sh">New</button><button class="b p" id="sv">Save</button></div>
+  <div id="frw" class="hide"><small id="frl">Pick frame</small><input type="range" id="fr" min="0" value="0"></div>
+</section>
+
+<section id="s1" class="hide">
+  <p style="margin:8px 0 12px;color:#aaa">Pick a GIF, video or image. For GIFs/videos, choose the frame, then save it as a 1080×2400 wallpaper.</p>
+  <button class="b p" id="pick" style="width:100%">Choose file</button>
+  <input type="file" id="f" accept="image/*,video/*,.gif" class="hide">
+</section>
+
+<section id="s2" class="hide">
+  <div class="row"><button class="b" id="all">All</button><button class="b" id="liked">♥ Liked</button></div>
+  <div id="lib"></div>
+</section>
+
+<div id="v"><img id="vi"><div class="row"><button class="b" id="vl">♡</button><button class="b p" id="vs">Set / Share</button><button class="b" id="vd">Delete</button><button class="b" id="vx">✕</button></div></div>
+<div id="t"></div>
+
+<script>
+const $=s=>document.querySelector(s),W=1080,H=2400;
+let mode='gen',seed=Date.now()%1e6,bm=null,vid=null,gif=null,dirty=1,only=0,cur=null;
+const cv=$('#cv'),cx=cv.getContext('2d');cv.width=360;cv.height=800;
+const t0=performance.now(),now=()=>(performance.now()-t0)/1000;
+function toast(m){const t=$('#t');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',1800)}
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+/* generators */
+function gen(x,w,h,s){const r=rng(s),h0=r()*360;
+  const g=x.createLinearGradient(0,0,w*r(),h);
+  g.addColorStop(0,`hsl(${h0},70%,16%)`);g.addColorStop(1,`hsl(${h0+60+r()*90},70%,34%)`);
+  x.fillStyle=g;x.fillRect(0,0,w,h);x.globalCompositeOperation='lighter';
+  for(let i=0;i<7;i++){const a=r()*w,b=r()*h,d=(.3+r()*.5)*w,c=h0+r()*140,q=x.createRadialGradient(a,b,0,a,b,d);
+    q.addColorStop(0,`hsla(${c},90%,55%,.45)`);q.addColorStop(1,`hsla(${c},90%,55%,0)`);x.fillStyle=q;x.fillRect(0,0,w,h)}
+  x.globalCompositeOperation='source-over';
+  if(s%3==0){x.lineWidth=w/300;for(let i=0;i<14;i++){x.strokeStyle=`hsla(${h0+i*8},90%,75%,.18)`;x.beginPath();
+    for(let k=0;k<=w;k+=w/30)x.lineTo(k,h*(.2+i*.045)+Math.sin(k/w*6+i+s)*h*.04);x.stroke()}}}
+function d3(x,w,h,t,s){const r=rng(s),h0=r()*360,n=24,sd=3+Math.floor(r()*4);
+  x.fillStyle='#05050c';x.fillRect(0,0,w,h);x.save();x.translate(w/2,h/2);x.lineWidth=w/110;
+  for(let i=0;i<n;i++){const z=((i+t*3)%n)/n,sc=Math.pow(z,2.2)*w*1.5+1,a=t*.3+i*.12;
+    x.strokeStyle=`hsla(${h0+z*120},90%,60%,${z})`;x.beginPath();
+    for(let k=0;k<=sd;k++){const th=a+k*2*Math.PI/sd;x[k?'lineTo':'moveTo'](Math.cos(th)*sc,Math.sin(th)*sc)}x.stroke()}
+  x.restore()}
+function cover(x,w,h,im,iw,ih){const k=Math.max(w/iw,h/ih);x.fillStyle='#000';x.fillRect(0,0,w,h);x.drawImage(im,(w-iw*k)/2,(h-ih*k)/2,iw*k,ih*k)}
+function render(x,w,h,t){
+  if(mode==='gen')gen(x,w,h,seed);else if(mode==='3d')d3(x,w,h,t,seed);
+  else if(bm)cover(x,w,h,bm.im,bm.w,bm.h);else{x.fillStyle='#181818';x.fillRect(0,0,w,h)}}
+(function loop(){if(mode==='3d'||dirty){render(cx,cv.width,cv.height,now());dirty=0}requestAnimationFrame(loop)})();
+
+/* storage */
+const db=new Promise(r=>{const q=indexedDB.open('wp',1);q.onupgradeneeded=()=>q.result.createObjectStore('w',{keyPath:'id',autoIncrement:true});q.onsuccess=()=>r(q.result)});
+const tx=async(m,f)=>{const d=await db;return new Promise(r=>{const q=f(d.transaction('w',m).objectStore('w'));q.onsuccess=()=>r(q.result)})};
+const put=v=>tx('readwrite',s=>s.put(v)),all=()=>tx('readonly',s=>s.getAll()),del=id=>tx('readwrite',s=>s.delete(id));
+
+/* tabs */
+function tab(i){[0,1,2].forEach(k=>{$('#s'+k).classList.toggle('hide',k!=i);$('#n'+k).classList.toggle('on',k==i)});if(i==2)lib();dirty=1}
+[0,1,2].forEach(k=>$('#n'+k).onclick=()=>tab(k));
+$('#m0').onclick=()=>{mode='gen';hideFr();dirty=1};
+$('#m1').onclick=()=>{mode='3d';hideFr()};
+$('#sh').onclick=()=>{seed=Math.floor(Math.random()*1e6);if(mode==='imp')mode='gen';dirty=1};
+
+/* import */
+const hideFr=()=>$('#frw').classList.add('hide');
+async function load(f){
+  mode='imp';gif=vid=null;bm=null;tab(0);hideFr();
+  try{
+    if(f.type==='image/gif'&&window.ImageDecoder){
+      const d=new ImageDecoder({data:await f.arrayBuffer(),type:'image/gif'});await d.tracks.ready;
+      gif={d,n:d.tracks.selectedTrack.frameCount};showFr(gif.n-1);await setFrame(0)}
+    else if(f.type.startsWith('video/')){
+      vid=document.createElement('video');vid.muted=true;vid.playsInline=true;vid.src=URL.createObjectURL(f);
+      await new Promise(r=>vid.onloadedmetadata=r);showFr(100);await setFrame(0)}
+    else{const im=await createImageBitmap(f);bm={im,w:im.width,h:im.height};dirty=1}
+  }catch(e){toast('Could not read file');mode='gen'}
+  dirty=1}
+function showFr(max){$('#fr').max=max;$('#fr').value=0;$('#frw').classList.remove('hide')}
+async function setFrame(v){
+  if(gif){const{image}=await gif.d.decode({frameIndex:+v});bm={im:image,w:image.displayWidth,h:image.displayHeight};$('#frl').textContent=`Frame ${+v+1} / ${gif.n}`}
+  else if(vid){vid.currentTime=v/100*(vid.duration||0);await new Promise(r=>vid.onseeked=r);bm={im:vid,w:vid.videoWidth,h:vid.videoHeight};$('#frl').textContent=`Time ${vid.currentTime.toFixed(1)}s`}
+  dirty=1}
+$('#fr').oninput=e=>setFrame(e.target.value);
+$('#pick').onclick=()=>$('#f').click();
+$('#f').onchange=e=>e.target.files[0]&&load(e.target.files[0]);
+(async()=>{ // files shared from other apps
+  if(!/shared=/.test(location.search)||!window.caches)return;
+  const c=await caches.open('shared'),ks=await c.keys();
+  if(ks.length){const b=await(await c.match(ks[0])).blob();await load(new File([b],'shared',{type:b.type}));for(const k of ks)await c.delete(k)}
+  history.replaceState(null,'','index.html')})();
+
+/* save */
+$('#sv').onclick=async()=>{
+  const o=document.createElement('canvas');o.width=W;o.height=H;render(o.getContext('2d'),W,H,now());
+  const blob=await new Promise(r=>o.toBlob(r,'image/png'));
+  await put({blob,liked:0,ts:Date.now()});toast('Saved to library')};
+
+/* library */
+async function lib(){
+  const L=(await all()).filter(r=>!only||r.liked).sort((a,b)=>b.ts-a.ts),g=$('#lib');g.innerHTML='';
+  if(!L.length)g.innerHTML='<p style="color:#888;grid-column:1/4">Nothing here yet.</p>';
+  L.forEach(r=>{const d=document.createElement('div'),i=new Image();i.src=URL.createObjectURL(r.blob);d.append(i);
+    if(r.liked){const h=document.createElement('i');h.textContent='♥';d.append(h)}d.onclick=()=>view(r);g.append(d)})}
+$('#all').onclick=()=>{only=0;lib()};$('#liked').onclick=()=>{only=1;lib()};
+function view(r){cur=r;$('#vi').src=URL.createObjectURL(r.blob);$('#vl').textContent=r.liked?'♥':'♡';$('#v').style.display='flex'}
+$('#vx').onclick=()=>{$('#v').style.display='none';lib()};
+$('#vl').onclick=async()=>{cur.liked=cur.liked?0:1;await put(cur);$('#vl').textContent=cur.liked?'♥':'♡'};
+$('#vd').onclick=async()=>{await del(cur.id);$('#v').style.display='none';lib()};
+$('#vs').onclick=async()=>{
+  const f=new File([cur.blob],'wallpaper.png',{type:'image/png'});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f]})}catch(e){}}
+  else{const a=document.createElement('a');a.href=URL.createObjectURL(cur.blob);a.download='wallpaper.png';a.click()}};
+
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+</script></body></html>
